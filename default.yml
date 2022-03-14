@@ -1,0 +1,19 @@
+---
+create_user: kevit
+root_user: neel
+copy_local_key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
+sys_packages: 'curl,vim,ufw,git,wget,build-essential,libssl-dev,unzip,python3,nginx,nodejs,aptitude,mongodb-org'
+NODEJS_VERSION: "16.x"
+ansible_distribution_release: "focal"
+http_host: "neel"
+http_conf: "neel.conf"
+ssh_port: "9834"
+aws_system_user: root
+aws_profile: default
+aws_access_key: "AKIAX36VLQ6FEOT7PZVM"
+aws_secret_key: "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"
+aws_region: ap-south-1
+aws_format: table
+project_path: /opt/kevit/ssh-iam-sync/index.js
+git_dest_path: /opt/ssh-iam-sync
+authorized_keys: /home/neel/.ssh/authorized_keys

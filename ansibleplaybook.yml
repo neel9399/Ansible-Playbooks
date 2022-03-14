@@ -1,0 +1,57 @@
+# to install nvm : 
+---
+- hosts: localhost
+  become: true
+  become_user: root
+    
+  tasks:
+    - name: nvm
+      shell: >
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+      args:
+        creates: "~/.nvm/nvm.sh"
+
+    # - name: Source nvm in ~/.{{ item }}
+    #   lineinfile: >
+    #       dest=~/.{{ item }}
+    #       line="source ~/.nvm/nvm.sh"
+    #       create=yes
+    #   tags: nvm
+    #   with_items:
+    #     - bashrc
+    #     - profile
+    # - name: Create nvm_dir if it does not exist
+    #   file:
+    #     mode: 0775
+    #     path: "/home/neel/.nvm"
+    #     state: directory
+      
+
+    # - name: Install NVM
+    #   shell: "curl -o-  https://raw.githubusercontent.com/creationix/nvm/v0.35.0/install.sh | NVM_SOURCE=~/.nvm/nvm.sh NVM_DIR=/home/neel/.nvm PROFILE=~/.bash_profile"
+    #   args:
+    #     warn: false
+    
+
+    # - name: Install nvm
+    #   git:
+    #   args:
+    #     repo: https://github.com/creationix/nvm.git
+    #     dest: ~/.nvm
+    #     version: "v0.31.0"
+
+    # - name: Source nvm in ~/.profile
+    #   lineinfile: >
+    #     dest=~/{{ item }}
+    #     line="source ~/.nvm/nvm.sh"
+    #     create=yes
+    #   with_items:
+    #     - .profile
+    #     - .bashrc
+
+    # - name: Install Node 14.x
+    #   shell: "source ~/.nvm/nvm.sh && nvm install 14.0.0"
+    #   args:
+    #     executable: /bin/bash
+      # register: nvm_install_result
+      # changed_when: "'is already installed.' not in nvm_install_result.stdout and 'is already installed.' not in nvm_install_result.stderr"

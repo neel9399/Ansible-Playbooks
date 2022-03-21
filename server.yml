@@ -1,0 +1,220 @@
+#################################################
+# Automated Initial Server Setup :-
+#################################################
+---
+- hosts: all
+  become: true
+  become_user: root 
+  vars_files:
+    - default.yml
+    
+  tasks:
+    - name: Install Prerequisites
+      apt: name=apt update_cache=yes state=latest force_apt_get=yes
+
+# Generate SSH key-pair
+    - name: generate SSH key "id_rsa"
+      openssh_keypair:
+        path: "~/.ssh/id_rsa"
+        type: rsa
+        size: 4096
+        state: present
+
+# Sudo Group Setup
+    - name: Make sure we have a 'kevit-sudo-group' group
+      group:
+        name: kevit-sudo-group
+        state: present
+
+    - name: Allow 'kevit-sudo-group' group to have passwordless sudo
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: '^%kevit-sudo-group'
+        line: '%kevit-sudo-group ALL=(ALL) NOPASSWD: ALL'
+        validate: '/usr/sbin/visudo -cf %s'
+
+# User + Key Setup
+    - name: Create a new regular user with sudo privileges
+      user:
+        name: "{{ create_user }}"
+        state: present
+        groups: kevit-sudo-group
+        append: true
+        create_home: true
+        shell: /bin/bash
+
+    - name: Set authorized key for remote user
+      authorized_key:
+        user: "{{ create_user }}"
+        state: present
+        key: "{{ copy_local_key }}"
+
+#Install NodeJS
+    - name: Install the gpg key for nodejs LTS
+      apt_key:
+        url: "https://deb.nodesource.com/gpgkey/nodesource.gpg.key"
+        state: present
+
+    - name: Install the nodejs LTS repos
+      apt_repository:
+        repo: "deb https://deb.nodesource.com/node_{{ NODEJS_VERSION }} {{ ansible_distribution_release }} main"
+        state: present
+        update_cache: yes
+
+# UFW Setup
+    - name: "UFW - Enable"
+      ufw:
+        state: enabled
+
+    - name: Set ssh '{{ ssh_port }}' port number
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: 'Port '
+        line: 'Port {{ ssh_port }}'
+        state: present
+      notify:
+        - Restart sshd
+
+    - name: "UFW - Allow port {{ ssh_port }}"
+      ufw:
+        rule: allow
+        port: "{{ ssh_port }}"
+        proto: tcp
+
+    - name: "UFW - Allow HTTP on port 80"
+      ufw:
+        rule: allow
+        port: "80"
+        proto: tcp
+
+    - name: "UFW - Allow HTTPS on port 443"
+      ufw:
+        rule: allow
+        port: "443"
+        proto: tcp
+
+    - name: UFW - Deny all other incoming traffic by default
+      ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+# Install mongodb 
+    - name: Import public key
+      apt_key:
+        url: 'https://www.mongodb.org/static/pgp/server-5.0.asc'
+        state: present
+    
+    - name: Add repository
+      apt_repository:
+        filename: '/etc/apt/sources.list.d/mongodb-org-5.0'
+        repo: 'deb https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/5.0 multiverse'
+        state: present
+
+# Install Packages
+    - name: Update apt
+      apt: update_cache=yes
+
+    - name: Install required system packages
+      apt: name={{ sys_packages }} state=latest
+
+    - name: Install PM2
+      npm:
+        name: pm2
+        global: yes    
+    - name: MongoDB - Running state
+      service:
+        name: mongod
+        state: started
+
+    - name: Update apt
+      apt: update_cache=yes
+                                        
+# Nginx Configuration
+    - name: Sets Nginx conf file
+      template:
+        src: "files/nginx.conf"
+        dest: "/etc/nginx/sites-available/{{ http_conf }}"
+
+    - name: Enables new site
+      file:
+        src: "/etc/nginx/sites-available/{{ http_conf }}"
+        dest: "/etc/nginx/sites-enabled/{{ http_conf }}"
+        state: link
+      notify: Reload Nginx
+    
+    - name: Removes "default" site
+      file:
+        path: "/etc/nginx/sites-enabled/default"
+        state: absent
+      notify: Reload Nginx
+      
+# Install AWS-CLI and do Configure
+    - name: Download awscliv2 installer.
+      unarchive:
+        src: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+        dest: "/tmp"
+        remote_src: true
+        creates: '/tmp/aws'
+        mode: 0755
+
+    - name: Run the installer.
+      command:
+      args:
+        cmd: "/tmp/aws/install"
+        creates: /usr/local/bin/aws
+      become: true
+      register: aws_install
+
+    # - name: Configure AWS.
+    #   shell: aws configure set {{ item.key }} {{ item.value }} --profile {{ aws_profile }}
+    #   with_dict:
+    #     aws_access_key_id: "{{ aws_access_key }}"
+    #     aws_secret_access_key: "{{ aws_secret_key }}"
+    #     region: "{{ aws_region }}"
+    #     format: "{{ aws_format }}"
+    #   changed_when: false
+
+# Clone SSH-IAM-SYNC Project
+    - name: pull from git
+      git:
+        repo: https://github.com/dkbhadeshiya/ssh-iam-sync.git
+        dest: ssh_iam_sync_path
+        clone: yes
+        version: master
+
+# Run Cronjob
+    # - name: Crontab file exists
+    #   cron:
+    #     name: Add date and time to a file.
+    #     minute: "*/2"
+    #     hour: "*"
+    #     day: "*"
+    #     month: "*"
+    #     weekday: "*"
+    #     user: "{{ root_user }}"
+    #     job: /usr/bin/env node {{ project_path }} -g Admin -S {{ authorized_keys }} -f >/dev/null 2>&1
+    #     state: present
+        
+#Handlers
+  handlers:
+    - name: Reload Nginx
+      service:
+        name: nginx
+        state: reloaded
+
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+
+    - name: Restart mongodb
+      service:
+        name: mongod
+        state: restarted
+
+    - name: Restart sshd
+      service:
+        name: sshd
+        state: restarted

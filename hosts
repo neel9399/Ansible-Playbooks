@@ -1,5 +1,5 @@
-[servers]
-localhost ansible_host=localhost
+[ipserver]
+20.204.6.117
 
 [servers:vars]
 ansible_python_interpreter=/usr/bin/python3

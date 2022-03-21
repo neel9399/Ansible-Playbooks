@@ -12,6 +12,14 @@
     - name: Install Prerequisites
       apt: name=apt update_cache=yes state=latest force_apt_get=yes
 
+# Generate SSH key-pair
+    - name: generate SSH key "id_rsa"
+      openssh_keypair:
+        path: "~/.ssh/id_rsa"
+        type: rsa
+        size: 4096
+        state: present
+
 # Sudo Group Setup
     - name: Make sure we have a 'kevit-sudo-group' group
       group:
@@ -56,18 +64,9 @@
 
     
 # UFW Setup
-    # - name: "UFW - Setup alternate port for SSH"
-    #   lineinfile:
-    #     dest: "/etc/ssh/sshd_config"
-    #     regexp: "^Port"
-    #     line: "Port {{ ssh_port }}"
-    #     notify: "Restart sshd"
-
-    # - name: "UFW - Allow port {{ ssh_port }}"
-    #   ufw:
-    #     rule: allow
-    #     port: "{{ ssh_port }}"
-    #     proto: tcp
+    - name: "UFW - Enable"
+      ufw:
+        state: enabled
 
     - name: "UFW - Allow HTTP on port 80"
       ufw:
@@ -86,25 +85,6 @@
         state: enabled
         policy: deny
         direction: incoming
-                                        
-# Nginx Configuration
-    - name: Sets Nginx conf file
-      template:
-        src: "files/nginx.conf"
-        dest: "/etc/nginx/sites-available/{{ http_conf }}"
-
-    - name: Enables new site
-      file:
-        src: "/etc/nginx/sites-available/{{ http_conf }}"
-        dest: "/etc/nginx/sites-enabled/{{ http_conf }}"
-        state: link
-      notify: Reload Nginx
-    
-    - name: Removes "default" site
-      file:
-        path: "/etc/nginx/sites-enabled/default"
-        state: absent
-      notify: Reload Nginx
 
 # Install mongodb 
     - name: Import public key
@@ -137,6 +117,26 @@
     - name: Update apt
       apt: update_cache=yes
 
+                                        
+# Nginx Configuration
+    - name: Sets Nginx conf file
+      template:
+        src: "files/nginx.conf"
+        dest: "/etc/nginx/sites-available/{{ http_conf }}"
+
+    - name: Enables new site
+      file:
+        src: "/etc/nginx/sites-available/{{ http_conf }}"
+        dest: "/etc/nginx/sites-enabled/{{ http_conf }}"
+        state: link
+      notify: Reload Nginx
+    
+    - name: Removes "default" site
+      file:
+        path: "/etc/nginx/sites-enabled/default"
+        state: absent
+      notify: Reload Nginx
+
 # Install AWS-CLI and do Configure
     - name: Download awscliv2 installer.
       unarchive:
@@ -167,22 +167,22 @@
     - name: pull from git
       git:
         repo: https://github.com/dkbhadeshiya/ssh-iam-sync.git
-        dest: git_dest_path
+        dest: ssh_iam_sync_path
         clone: yes
         version: master
 
 # Run Cronjob
-    - name: Crontab file exists
-      cron:
-        name: Add date and time to a file.
-        minute: "*/2"
-        hour: "*"
-        day: "*"
-        month: "*"
-        weekday: "*"
-        user: "{{ root_user }}"
-        job: /usr/bin/env node {{ project_path }} -g Admin -S {{ authorized_keys }} -f >/dev/null 2>&1
-        state: present
+    # - name: Crontab file exists
+    #   cron:
+    #     name: Add date and time to a file.
+    #     minute: "*/2"
+    #     hour: "*"
+    #     day: "*"
+    #     month: "*"
+    #     weekday: "*"
+    #     user: "{{ root_user }}"
+    #     job: /usr/bin/env node {{ project_path }} -g Admin -S {{ authorized_keys }} -f >/dev/null 2>&1
+    #     state: present
         
 #Handlers
   handlers:
